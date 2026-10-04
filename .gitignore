@@ -1,0 +1,35 @@
+# Terraform state records every managed resource in plain text and can
+# contain secrets. It must never be committed.
+*.tfstate
+*.tfstate.*
+
+# Provider plugins and module cache (re-downloaded by `terraform init`).
+# Note: .terraform.lock.hcl is deliberately NOT ignored - it pins provider
+# versions and checksums, so it is committed.
+.terraform/
+
+# Crash logs can include sensitive request data.
+crash.log
+crash.*.log
+
+# Variable files often hold account-specific or sensitive values.
+*.tfvars
+*.tfvars.json
+
+# Local-only overrides.
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# CLI config and saved plans (plans can contain secrets too).
+.terraformrc
+terraform.rc
+*.tfplan
+
+# Environment files.
+.env
+.env.*
+
+# macOS
+.DS_Store
