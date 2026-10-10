@@ -86,6 +86,52 @@ data "aws_iam_policy_document" "logs_bucket" {
       values   = ["false"]
     }
   }
+
+  # CloudTrail checks the bucket's ACL before delivering, but only on behalf
+  # of our own trail.
+  statement {
+    sid       = "AllowCloudTrailAclCheck"
+    effect    = "Allow"
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.logs.arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [local.trail_arn]
+    }
+  }
+
+  # Only our trail may write, and only under its own prefix for this account.
+  # The SourceArn condition stops another account's trail using this bucket.
+  statement {
+    sid       = "AllowCloudTrailWrite"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.logs.arn}/cloudtrail/AWSLogs/${local.account_id}/*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [local.trail_arn]
+    }
+  }
 }
 
 resource "aws_s3_bucket_policy" "logs" {
