@@ -12,7 +12,7 @@ locals {
 # is no longer enough to read the logs: the reader also needs kms:Decrypt,
 # which only principals granted it in IAM have.
 resource "aws_kms_key" "cloudtrail" {
-  description             = "Encrypts CloudTrail log files for the security baseline"
+  description             = "Encrypts security baseline logs (CloudTrail files and the CloudWatch log group)"
   enable_key_rotation     = true
   deletion_window_in_days = 30 # longest window: maximum time to notice and cancel a deletion
   policy                  = data.aws_iam_policy_document.cloudtrail_kms.json
@@ -82,6 +82,31 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
     }
   }
 
+  # CloudWatch Logs may use the key, but only for our CloudTrail log group.
+  statement {
+    sid    = "AllowCloudWatchLogsForTrailLogGroup"
+    effect = "Allow"
+    actions = [
+      "kms:Encrypt*",
+      "kms:Decrypt*",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:Describe*",
+    ]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${local.region}.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values   = [local.cloudtrail_log_group_arn]
+    }
+  }
+
   # Deliberately no "any principal in the account may decrypt" statement
   # (the console default). Reading logs requires an explicit IAM grant.
 }
@@ -103,8 +128,17 @@ resource "aws_cloudtrail" "main" {
 
   kms_key_id = aws_kms_key.cloudtrail.arn
 
-  # CloudTrail checks it can write to the bucket when the trail is created.
-  depends_on = [aws_s3_bucket_policy.logs]
+  # Live feed into CloudWatch Logs (see logging.tf). CloudTrail requires the
+  # ":*" suffix on the log group ARN.
+  cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
+  cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_to_cloudwatch.arn
+
+  # CloudTrail checks it can write to the bucket, and to the log group via the
+  # role, so both permissions must exist first.
+  depends_on = [
+    aws_s3_bucket_policy.logs,
+    aws_iam_role_policy.cloudtrail_to_cloudwatch,
+  ]
 }
 
 output "cloudtrail_name" {
