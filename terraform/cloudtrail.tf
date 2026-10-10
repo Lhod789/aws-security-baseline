@@ -1,0 +1,116 @@
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+  region     = data.aws_region.current.region
+  trail_name = "security-baseline-trail"
+
+  # Built as a string (not read from the trail resource) because the KMS key
+  # policy and bucket policy must name the trail before the trail exists.
+  trail_arn = "arn:aws:cloudtrail:${local.region}:${local.account_id}:trail/${local.trail_name}"
+}
+
+# Customer-managed key for CloudTrail logs. Being allowed to read the bucket
+# is no longer enough to read the logs: the reader also needs kms:Decrypt,
+# which only principals granted it in IAM have.
+resource "aws_kms_key" "cloudtrail" {
+  description             = "Encrypts CloudTrail log files for the security baseline"
+  enable_key_rotation     = true
+  deletion_window_in_days = 30 # longest window: maximum time to notice and cancel a deletion
+  policy                  = data.aws_iam_policy_document.cloudtrail_kms.json
+}
+
+resource "aws_kms_alias" "cloudtrail" {
+  name          = "alias/security-baseline-cloudtrail"
+  target_key_id = aws_kms_key.cloudtrail.key_id
+}
+
+data "aws_iam_policy_document" "cloudtrail_kms" {
+  # Lets IAM policies in this account grant use of the key. Without this the
+  # key could become unmanageable (locked out).
+  statement {
+    sid       = "EnableIAMPolicies"
+    effect    = "Allow"
+    actions   = ["kms:*"]
+    resources = ["*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${local.account_id}:root"]
+    }
+  }
+
+  # CloudTrail may encrypt, but only for this account's trails and only when
+  # acting for this specific trail (prevents a confused-deputy misuse).
+  statement {
+    sid       = "AllowCloudTrailEncrypt"
+    effect    = "Allow"
+    actions   = ["kms:GenerateDataKey*"]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [local.trail_arn]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "kms:EncryptionContext:aws:cloudtrail:arn"
+      values   = ["arn:aws:cloudtrail:*:${local.account_id}:trail/*"]
+    }
+  }
+
+  statement {
+    sid       = "AllowCloudTrailDescribeKey"
+    effect    = "Allow"
+    actions   = ["kms:DescribeKey"]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [local.trail_arn]
+    }
+  }
+
+  # Deliberately no "any principal in the account may decrypt" statement
+  # (the console default). Reading logs requires an explicit IAM grant.
+}
+
+# Records every management API call in the account, in every region.
+resource "aws_cloudtrail" "main" {
+  name           = local.trail_name
+  s3_bucket_name = aws_s3_bucket.logs.id
+  s3_key_prefix  = "cloudtrail"
+
+  # Attackers like regions nobody watches; record them all.
+  is_multi_region_trail = true
+
+  # IAM and STS are global services; without this, identity changes go unrecorded.
+  include_global_service_events = true
+
+  # Signed hourly digest files prove whether log files were altered or deleted.
+  enable_log_file_validation = true
+
+  kms_key_id = aws_kms_key.cloudtrail.arn
+
+  # CloudTrail checks it can write to the bucket when the trail is created.
+  depends_on = [aws_s3_bucket_policy.logs]
+}
+
+output "cloudtrail_name" {
+  value = aws_cloudtrail.main.name
+}
+
+output "cloudtrail_kms_key_alias" {
+  value = aws_kms_alias.cloudtrail.name
+}

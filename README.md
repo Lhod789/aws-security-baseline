@@ -11,3 +11,4 @@ Each control states the attack it exists to stop.
 | Control | Attack it stops | File |
 |---|---|---|
 | S3 log bucket: private (account-wide and bucket-level public access block), ACLs disabled, versioned, encrypted at rest, HTTPS-only | Attackers deleting or reading logs to cover their tracks; accidental public exposure of log data | [`terraform/s3.tf`](terraform/s3.tf) |
+| CloudTrail: all regions, global service events, log file validation, encrypted with a customer-managed KMS key, bucket writable only by this trail | Unrecorded activity in unwatched regions; untracked identity changes; tampering with logs; anyone with bucket access reading logs | [`terraform/cloudtrail.tf`](terraform/cloudtrail.tf) |
