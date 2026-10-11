@@ -12,7 +12,7 @@ locals {
 # is no longer enough to read the logs: the reader also needs kms:Decrypt,
 # which only principals granted it in IAM have.
 resource "aws_kms_key" "cloudtrail" {
-  description             = "Encrypts security baseline logs (CloudTrail files and the CloudWatch log group)"
+  description             = "Encrypts security baseline logs and alerts (CloudTrail files, CloudWatch log group, SNS alert topic)"
   enable_key_rotation     = true
   deletion_window_in_days = 30 # longest window: maximum time to notice and cancel a deletion
   policy                  = data.aws_iam_policy_document.cloudtrail_kms.json
@@ -104,6 +104,26 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
       test     = "ArnEquals"
       variable = "kms:EncryptionContext:aws:logs:arn"
       values   = [local.cloudtrail_log_group_arn]
+    }
+  }
+
+  # CloudWatch alarms publish to the encrypted SNS alert topic, which needs
+  # the key; limited to alarms in this account.
+  statement {
+    sid       = "AllowCloudWatchAlarmsForEncryptedAlerts"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account_id]
     }
   }
 
