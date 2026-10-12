@@ -16,3 +16,11 @@ Each control states the attack it exists to stop.
 | IAM: password policy (14+ characters, no reuse of last 24, no forced expiry, per CIS and NIST); MFA required for all actions via the `mfa-required` group | Phished or leaked passwords used without a second factor; weak or recycled passwords; removing a user's MFA to weaken them | [`terraform/iam.tf`](terraform/iam.tf) |
 | VPC: private network with no internet gateway, no public IPs, default security group stripped of all rules, app security group allowing HTTPS within the VPC only (no SSH), flow logs for all traffic | Internet exposure; remote-login brute force; lateral movement through the default security group; unnoticed scanning or data leaving the network | [`terraform/vpc.tf`](terraform/vpc.tf) |
 | Alert channel: SNS topic encrypted with the KMS key; only this account's CloudWatch alarms may publish; TLS only; email subscription (address kept out of the repo) | Detections that fire but nobody hears; outsiders injecting fake alerts; alert contents exposed | [`terraform/alerting.tf`](terraform/alerting.tf) |
+
+## Detections
+
+Each detection is proven by a staged break: break the control, receive the alert, see the drift, restore with Terraform. Full write-ups: [`detections/README.md`](detections/README.md).
+
+| Detection | MITRE ATT&CK | Proven |
+|---|---|---|
+| CloudTrail tampering: logging stopped, trail deleted, reconfigured or narrowed | T1562.008 | ✅ alert ~1.5 min after `StopLogging`; restored by `terraform apply` |
