@@ -24,3 +24,4 @@ Each detection is proven by a staged break: break the control, receive the alert
 | Detection | MITRE ATT&CK | Proven |
 |---|---|---|
 | CloudTrail tampering: logging stopped, trail deleted, reconfigured or narrowed | T1562.008 | ✅ alert ~1.5 min after `StopLogging`; restored by `terraform apply` |
+| S3 public access changes: bucket or account public-access block, bucket policy, ACL or ownership changed (failed attempts included) | T1530 | ✅ alert ~3 min after the bucket block was removed; the follow-up public-policy attempt was refused by the account-wide block; restored by `terraform apply` |
