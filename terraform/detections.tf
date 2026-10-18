@@ -10,6 +10,14 @@ locals {
       description = "CloudTrail stopped, deleted or reconfigured (ATT&CK T1562.008 Disable or Modify Cloud Logs). Includes failed attempts. See detections/README.md."
       pattern     = "{ ($.eventSource = \"cloudtrail.amazonaws.com\") && (($.eventName = \"StopLogging\") || ($.eventName = \"DeleteTrail\") || ($.eventName = \"UpdateTrail\") || ($.eventName = \"PutEventSelectors\") || ($.eventName = \"CreateTrail\") || ($.eventName = \"StartLogging\")) }"
     }
+
+    # Account-level and bucket-level public access block changes are both
+    # recorded under s3.amazonaws.com (checked in Event history).
+    s3-public-access = {
+      metric_name = "S3PublicAccessChange"
+      description = "S3 public access block, bucket policy, ACL or ownership controls changed, at bucket or account level (ATT&CK T1530 Data from Cloud Storage). Includes failed attempts. See detections/README.md."
+      pattern     = "{ ($.eventSource = \"s3.amazonaws.com\") && (($.eventName = \"PutBucketPublicAccessBlock\") || ($.eventName = \"DeleteBucketPublicAccessBlock\") || ($.eventName = \"PutAccountPublicAccessBlock\") || ($.eventName = \"DeleteAccountPublicAccessBlock\") || ($.eventName = \"PutBucketPolicy\") || ($.eventName = \"DeleteBucketPolicy\") || ($.eventName = \"PutBucketAcl\") || ($.eventName = \"PutBucketOwnershipControls\") || ($.eventName = \"DeleteBucketOwnershipControls\")) }"
+    }
   }
 }
 
