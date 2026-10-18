@@ -18,6 +18,17 @@ locals {
       description = "S3 public access block, bucket policy, ACL or ownership controls changed, at bucket or account level (ATT&CK T1530 Data from Cloud Storage). Includes failed attempts. See detections/README.md."
       pattern     = "{ ($.eventSource = \"s3.amazonaws.com\") && (($.eventName = \"PutBucketPublicAccessBlock\") || ($.eventName = \"DeleteBucketPublicAccessBlock\") || ($.eventName = \"PutAccountPublicAccessBlock\") || ($.eventName = \"DeleteAccountPublicAccessBlock\") || ($.eventName = \"PutBucketPolicy\") || ($.eventName = \"DeleteBucketPolicy\") || ($.eventName = \"PutBucketAcl\") || ($.eventName = \"PutBucketOwnershipControls\") || ($.eventName = \"DeleteBucketOwnershipControls\")) }"
     }
+
+    # Any security group change, not only "open to the world": a precise
+    # 0.0.0.0/0 match only reliably checks the first rule in a request, so the
+    # broad match is safer and triage reads requestParameters instead.
+    # ModifySecurityGroupRules (editing an existing rule) is newer than the CIS
+    # list and is included deliberately.
+    security-group-changes = {
+      metric_name = "SecurityGroupChange"
+      description = "Security group created, deleted or its rules changed (ATT&CK T1562.007 Disable or Modify Cloud Firewall). Includes failed attempts. Triage: read requestParameters for 0.0.0.0/0 or ::/0. See detections/README.md."
+      pattern     = "{ ($.eventSource = \"ec2.amazonaws.com\") && (($.eventName = \"AuthorizeSecurityGroupIngress\") || ($.eventName = \"AuthorizeSecurityGroupEgress\") || ($.eventName = \"RevokeSecurityGroupIngress\") || ($.eventName = \"RevokeSecurityGroupEgress\") || ($.eventName = \"ModifySecurityGroupRules\") || ($.eventName = \"CreateSecurityGroup\") || ($.eventName = \"DeleteSecurityGroup\")) }"
+    }
   }
 }
 
