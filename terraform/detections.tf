@@ -29,6 +29,15 @@ locals {
       description = "Security group created, deleted or its rules changed (ATT&CK T1562.007 Disable or Modify Cloud Firewall). Includes failed attempts. Triage: read requestParameters for 0.0.0.0/0 or ::/0. See detections/README.md."
       pattern     = "{ ($.eventSource = \"ec2.amazonaws.com\") && (($.eventName = \"AuthorizeSecurityGroupIngress\") || ($.eventName = \"AuthorizeSecurityGroupEgress\") || ($.eventName = \"RevokeSecurityGroupIngress\") || ($.eventName = \"RevokeSecurityGroupEgress\") || ($.eventName = \"ModifySecurityGroupRules\") || ($.eventName = \"CreateSecurityGroup\") || ($.eventName = \"DeleteSecurityGroup\")) }"
     }
+
+    # Weakening sign-in: MFA removed, password policy relaxed, a user taken out
+    # of mfa-required, or the MFA policy detached or rewritten. IAM is global
+    # (recorded in us-east-1); the all-region trail still delivers it here.
+    auth-weakening = {
+      metric_name = "AuthWeakening"
+      description = "MFA deactivated or deleted, password policy changed or deleted, user removed from a group, or a group policy detached or rewritten (ATT&CK T1556 Modify Authentication Process). Includes failed attempts. See detections/README.md."
+      pattern     = "{ ($.eventSource = \"iam.amazonaws.com\") && (($.eventName = \"DeactivateMFADevice\") || ($.eventName = \"DeleteVirtualMFADevice\") || ($.eventName = \"UpdateAccountPasswordPolicy\") || ($.eventName = \"DeleteAccountPasswordPolicy\") || ($.eventName = \"RemoveUserFromGroup\") || ($.eventName = \"DetachGroupPolicy\") || ($.eventName = \"CreatePolicyVersion\") || ($.eventName = \"SetDefaultPolicyVersion\")) }"
+    }
   }
 }
 
