@@ -127,6 +127,30 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
     }
   }
 
+  # Prevention: this key encrypts CloudTrail, the CloudWatch log group and the
+  # alert topic, so disabling or deleting it would blind the monitoring that
+  # should catch it. Only root (break-glass) may do either. Someone with admin
+  # could still edit this policy first, but that PutKeyPolicy is itself
+  # detected while the key, and therefore the alerting, still works.
+  # Teardown: remove this statement first, or run the destroy as root.
+  statement {
+    sid       = "DenyKeyDisableOrDeletionExceptRoot"
+    effect    = "Deny"
+    actions   = ["kms:DisableKey", "kms:ScheduleKeyDeletion"]
+    resources = ["*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "StringNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::${local.account_id}:root"]
+    }
+  }
+
   # Deliberately no "any principal in the account may decrypt" statement
   # (the console default). Reading logs requires an explicit IAM grant.
 }
