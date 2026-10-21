@@ -70,3 +70,19 @@ Foundations Benchmark specifies.
 | **Restore** | `terraform plan` should show the password policy drift; `terraform apply` |
 | **Proven (password policy)** | 2026-10-19: minimum length lowered 14 → 8 at 21:42:19 UTC (recorded in `us-east-1`) → alarm 21:44:44 (~2.4 min) → email delivered → `terraform plan` showed exactly `minimum_password_length = 8 -> 14` → restored 21:57:18. Unlike detection 3, Terraform caught this drift, because it manages the password policy as one whole resource |
 | **Proven (MFA enforcement, real sign-in)** | 2026-10-20: a temporary user with `ReadOnlyAccess`, signed in without MFA. First run: reads were allowed, because the test user had not been added to `mfa-required` (a gap in the test setup, found from the user's group membership). After adding it: `ListBuckets` and about 12 other calls returned AccessDenied, even with `ReadOnlyAccess`. The user was then deleted; removing it from the group tripped this alarm, as expected |
+
+## 5. KMS key tampering
+
+| | |
+|---|---|
+| **Fires when** | The KMS key is disabled or scheduled for deletion, its rotation is switched off, or its key policy is changed |
+| **Why it matters** | One customer-managed key encrypts the CloudTrail files, the CloudWatch log group and the alert topic. Disabling or deleting it makes that data unreadable (permanently, once deleted) |
+| **MITRE ATT&CK** | [T1485 — Data Destruction](https://attack.mitre.org/techniques/T1485/) |
+| **Filter pattern** | `{ ($.eventSource = "kms.amazonaws.com") && (($.eventName = "DisableKey") \|\| ($.eventName = "ScheduleKeyDeletion") \|\| ($.eventName = "DisableKeyRotation") \|\| ($.eventName = "PutKeyPolicy")) }` |
+| **Known benign triggers** | Legitimate Terraform changes to the key policy |
+| **Blind spot (and why prevention matters)** | A key that is disabled or pending deletion cannot be used at all, so a *successful* disable or deletion would also stop CloudTrail delivery, CloudWatch ingestion and the alert topic. The detection could be blinded by the attack it is meant to catch. The key policy therefore denies those actions to everyone except root, and this detection catches the refused attempts |
+| **Staged break** | Switch off key rotation (safe: the key keeps working). Then, with the prevention in place, attempt to schedule the key's deletion and expect a refusal |
+| **Restore** | `terraform plan` should show `enable_key_rotation: false → true`; `terraform apply` |
+| **Prevention** | The key policy denies `kms:DisableKey` and `kms:ScheduleKeyDeletion` to everyone except the account root (break-glass). `PutKeyPolicy` is deliberately not denied, so Terraform can still manage the key: an attacker with admin rights could remove the deny first, but that policy change is caught by this detection while the key, and therefore the alerting, still works. Teardown must remove the deny first or run as root |
+| **Proven (rotation)** | 2026-10-20: rotation switched off in the console 21:06:34 UTC → alarm 21:09:42 (~3 min) → email delivered → `terraform plan` showed exactly `enable_key_rotation = false -> true` → restored 21:16:59 |
+| **Proven (prevention)** | 2026-10-20: `admin` attempted `ScheduleKeyDeletion` 22:00:40 UTC → **refused** (`AccessDeniedException … explicit deny in a resource-based policy`) → key stayed enabled, CloudTrail kept delivering → the refused attempt raised the alarm at 22:02:42 (~2 min) → email delivered |

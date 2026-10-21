@@ -38,6 +38,15 @@ locals {
       description = "MFA deactivated or deleted, password policy changed or deleted, user removed from a group, or a group policy detached or rewritten (ATT&CK T1556 Modify Authentication Process). Includes failed attempts. See detections/README.md."
       pattern     = "{ ($.eventSource = \"iam.amazonaws.com\") && (($.eventName = \"DeactivateMFADevice\") || ($.eventName = \"DeleteVirtualMFADevice\") || ($.eventName = \"UpdateAccountPasswordPolicy\") || ($.eventName = \"DeleteAccountPasswordPolicy\") || ($.eventName = \"RemoveUserFromGroup\") || ($.eventName = \"DetachGroupPolicy\") || ($.eventName = \"CreatePolicyVersion\") || ($.eventName = \"SetDefaultPolicyVersion\")) }"
     }
+
+    # The KMS key encrypts CloudTrail, the CloudWatch log group and the alert
+    # topic. Disabling or deleting it would blind that whole pipeline, so the
+    # key policy also denies those actions (prevention); this catches attempts.
+    kms-key-tampering = {
+      metric_name = "KmsKeyTampering"
+      description = "KMS key disabled, scheduled for deletion, rotation disabled or key policy changed (ATT&CK T1485 Data Destruction). Includes failed attempts. See detections/README.md."
+      pattern     = "{ ($.eventSource = \"kms.amazonaws.com\") && (($.eventName = \"DisableKey\") || ($.eventName = \"ScheduleKeyDeletion\") || ($.eventName = \"DisableKeyRotation\") || ($.eventName = \"PutKeyPolicy\")) }"
+    }
   }
 }
 
