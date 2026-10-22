@@ -47,6 +47,15 @@ locals {
       description = "KMS key disabled, scheduled for deletion, rotation disabled or key policy changed (ATT&CK T1485 Data Destruction). Includes failed attempts. See detections/README.md."
       pattern     = "{ ($.eventSource = \"kms.amazonaws.com\") && (($.eventName = \"DisableKey\") || ($.eventName = \"ScheduleKeyDeletion\") || ($.eventName = \"DisableKeyRotation\") || ($.eventName = \"PutKeyPolicy\")) }"
     }
+
+    # Any use of the root user (CIS pattern). Excludes actions AWS services take
+    # on root's behalf (invokedBy) and AWS's own service events. Root is the
+    # break-glass for KMS key deletion at teardown, which will fire this too.
+    root-usage = {
+      metric_name = "RootUsage"
+      description = "The root user was used (ATT&CK T1078.004 Valid Accounts: Cloud Accounts). Any use deserves a human look: a planned emergency, or someone with the root password and MFA. See detections/README.md."
+      pattern     = "{ ($.userIdentity.type = \"Root\") && ($.userIdentity.invokedBy NOT EXISTS) && ($.eventType != \"AwsServiceEvent\") }"
+    }
   }
 }
 

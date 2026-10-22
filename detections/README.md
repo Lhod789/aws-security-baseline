@@ -86,3 +86,16 @@ Foundations Benchmark specifies.
 | **Prevention** | The key policy denies `kms:DisableKey` and `kms:ScheduleKeyDeletion` to everyone except the account root (break-glass). `PutKeyPolicy` is deliberately not denied, so Terraform can still manage the key: an attacker with admin rights could remove the deny first, but that policy change is caught by this detection while the key, and therefore the alerting, still works. Teardown must remove the deny first or run as root |
 | **Proven (rotation)** | 2026-10-20: rotation switched off in the console 21:06:34 UTC → alarm 21:09:42 (~3 min) → email delivered → `terraform plan` showed exactly `enable_key_rotation = false -> true` → restored 21:16:59 |
 | **Proven (prevention)** | 2026-10-20: `admin` attempted `ScheduleKeyDeletion` 22:00:40 UTC → **refused** (`AccessDeniedException … explicit deny in a resource-based policy`) → key stayed enabled, CloudTrail kept delivering → the refused attempt raised the alarm at 22:02:42 (~2 min) → email delivered |
+
+## 6. Root user usage
+
+| | |
+|---|---|
+| **Fires when** | Any action is taken as the account's root user, including signing in to the console |
+| **Why it matters** | Root can do anything, including closing the account, and policies cannot restrict it. It is kept for emergencies, so any use is either a planned break-glass or someone who has the root password and MFA |
+| **MITRE ATT&CK** | [T1078.004 — Valid Accounts: Cloud Accounts](https://attack.mitre.org/techniques/T1078/004/) |
+| **Filter pattern** | `{ ($.userIdentity.type = "Root") && ($.userIdentity.invokedBy NOT EXISTS) && ($.eventType != "AwsServiceEvent") }` (the CIS AWS Foundations Benchmark pattern) |
+| **Excluded on purpose** | Actions AWS services take on root's behalf (`invokedBy`) and AWS's own service events, which are background noise rather than someone using root |
+| **Known benign triggers** | Planned break-glass use, for example deleting the KMS key at teardown (the key policy reserves that for root) |
+| **Staged break** | Sign in to the console as root once, with MFA, then sign out. Nothing to restore: the use itself is the event |
+| **Proven** | 2026-10-21: root signed in with MFA at 20:42:06 UTC and browsed Billing → alarm 20:45:19 (~3 min, datapoint 22: one console visit made 22 root calls in five minutes) → email delivered. The investigation found 27 root events, all reads, from the expected address. The sign-in was recorded in `us-west-2`, so a London-only trail would have missed it |
