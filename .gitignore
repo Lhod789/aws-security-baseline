@@ -33,3 +33,6 @@ terraform.rc
 
 # macOS
 .DS_Store
+
+# Python bytecode from running the tests.
+__pycache__/
