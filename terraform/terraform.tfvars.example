@@ -1,0 +1,3 @@
+# Copy this file to terraform.tfvars (which git ignores) and set your own
+# address. Alerts are emailed here after you confirm the subscription.
+alert_email = "you@example.com"
